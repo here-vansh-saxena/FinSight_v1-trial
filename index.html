@@ -1,0 +1,1404 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>FinSight AI — Financial Statement Analysis</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&family=Space+Grotesk:wght@500;600;700&display=swap" rel="stylesheet">
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<style>
+  :root{
+    --bg:#070a14;
+    --bg-2:#0b1124;
+    --surface:rgba(255,255,255,0.04);
+    --surface-2:rgba(255,255,255,0.07);
+    --border:rgba(255,255,255,0.10);
+    --text:#e9ecf5;
+    --muted:#8b93ad;
+    --primary:#7c5cff;
+    --primary-2:#22d3ee;
+    --accent:#34e7b5;
+    --danger:#ff6b81;
+    --warn:#ffb648;
+    --good:#34e7b5;
+    --grad: linear-gradient(135deg,#7c5cff 0%,#22d3ee 100%);
+    --grad-2: linear-gradient(135deg,#34e7b5 0%,#22d3ee 100%);
+    --shadow: 0 30px 80px -30px rgba(124,92,255,0.45);
+    --radius: 18px;
+    --font: 'Inter',system-ui,sans-serif;
+    --font-display:'Space Grotesk','Inter',sans-serif;
+  }
+  html[data-theme="light"]{
+    --bg:#f6f7fb;
+    --bg-2:#eef0f7;
+    --surface:rgba(255,255,255,0.85);
+    --surface-2:#ffffff;
+    --border:rgba(15,20,40,0.08);
+    --text:#0e1430;
+    --muted:#5a6385;
+    --shadow: 0 30px 80px -40px rgba(80,60,180,0.25);
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;padding:0;background:var(--bg);color:var(--text);font-family:var(--font);min-height:100%;-webkit-font-smoothing:antialiased}
+  body{
+    background:
+      radial-gradient(1200px 600px at 80% -10%, rgba(124,92,255,0.25), transparent 60%),
+      radial-gradient(900px 500px at -10% 30%, rgba(34,211,238,0.18), transparent 60%),
+      radial-gradient(700px 500px at 50% 110%, rgba(52,231,181,0.12), transparent 60%),
+      var(--bg);
+    min-height:100vh;
+  }
+  ::selection{background:rgba(124,92,255,0.4);color:#fff}
+  a{color:inherit}
+  button{font-family:inherit}
+
+  /* Layout */
+  .app{display:grid;grid-template-columns:260px 1fr;min-height:100vh}
+  @media (max-width:900px){.app{grid-template-columns:1fr}.sidebar{display:none}}
+
+  .sidebar{
+    border-right:1px solid var(--border);
+    padding:22px 18px;
+    background:linear-gradient(180deg,rgba(255,255,255,0.03),transparent);
+    position:sticky;top:0;height:100vh;backdrop-filter: blur(20px);
+  }
+  .logo{display:flex;align-items:center;gap:10px;font-family:var(--font-display);font-weight:700;font-size:18px;letter-spacing:.3px}
+  .logo-mark{width:34px;height:34px;border-radius:10px;background:var(--grad);display:grid;place-items:center;box-shadow:var(--shadow)}
+  .logo-mark svg{width:18px;height:18px;color:#fff}
+  .logo small{display:block;font-size:11px;color:var(--muted);font-weight:500;letter-spacing:1px;text-transform:uppercase}
+
+  .nav{margin-top:28px;display:flex;flex-direction:column;gap:4px}
+  .nav button{
+    display:flex;align-items:center;gap:12px;padding:11px 12px;border-radius:12px;
+    background:transparent;border:1px solid transparent;color:var(--muted);cursor:pointer;
+    text-align:left;font-size:14px;font-weight:500;transition:all .2s
+  }
+  .nav button svg{width:18px;height:18px}
+  .nav button:hover{background:var(--surface);color:var(--text)}
+  .nav button.active{background:var(--surface-2);color:var(--text);border-color:var(--border);box-shadow:inset 0 0 0 1px rgba(124,92,255,0.25)}
+
+  .sidebar-foot{position:absolute;bottom:18px;left:18px;right:18px;font-size:12px;color:var(--muted)}
+
+  .main{padding:28px 36px 80px;max-width:1500px;width:100%;margin:0 auto}
+  @media (max-width:700px){.main{padding:18px}}
+
+  .topbar{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:24px}
+  .topbar h1{font-family:var(--font-display);font-size:26px;margin:0;font-weight:600;letter-spacing:-.3px}
+  .topbar p{margin:4px 0 0;color:var(--muted);font-size:13px}
+  .top-actions{display:flex;gap:10px;align-items:center;flex-wrap:wrap}
+
+  .chip{
+    display:inline-flex;align-items:center;gap:6px;padding:7px 12px;border-radius:999px;
+    background:var(--surface);border:1px solid var(--border);font-size:12px;color:var(--muted)
+  }
+  .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--good);box-shadow:0 0 10px var(--good)}
+
+  .btn{
+    border:1px solid var(--border);background:var(--surface);color:var(--text);
+    padding:10px 14px;border-radius:12px;cursor:pointer;font-size:13px;font-weight:500;
+    display:inline-flex;align-items:center;gap:8px;transition:all .2s
+  }
+  .btn:hover{background:var(--surface-2);transform:translateY(-1px)}
+  .btn.primary{background:var(--grad);border:0;color:#fff;box-shadow:var(--shadow)}
+  .btn.primary:hover{filter:brightness(1.08)}
+  .btn.ghost{background:transparent}
+  .btn.danger{color:var(--danger);border-color:rgba(255,107,129,0.3)}
+
+  .glass{
+    background:var(--surface);
+    backdrop-filter: blur(18px) saturate(140%);
+    -webkit-backdrop-filter: blur(18px) saturate(140%);
+    border:1px solid var(--border);
+    border-radius:var(--radius);
+    box-shadow: 0 1px 0 rgba(255,255,255,0.04) inset, 0 30px 60px -40px rgba(0,0,0,0.5);
+  }
+
+  /* Hero / upload */
+  .hero{padding:28px;display:grid;grid-template-columns:1.2fr .8fr;gap:24px;margin-bottom:24px}
+  @media (max-width:1000px){.hero{grid-template-columns:1fr}}
+  .hero h2{font-family:var(--font-display);font-size:32px;margin:0 0 8px;letter-spacing:-.5px;line-height:1.1}
+  .hero h2 .grad{background:var(--grad);-webkit-background-clip:text;background-clip:text;color:transparent}
+  .hero p{color:var(--muted);font-size:14px;line-height:1.6;margin:0 0 18px;max-width:520px}
+  .hero-stats{display:flex;gap:18px;flex-wrap:wrap;margin-top:18px}
+  .hero-stat{font-size:12px;color:var(--muted)}
+  .hero-stat b{display:block;font-family:var(--font-display);font-size:22px;color:var(--text)}
+
+  .dropzone{
+    border:1.5px dashed rgba(124,92,255,0.45);
+    border-radius:16px;padding:28px;text-align:center;cursor:pointer;
+    background:linear-gradient(180deg,rgba(124,92,255,0.08),rgba(34,211,238,0.04));
+    transition:all .2s;position:relative;overflow:hidden
+  }
+  .dropzone:hover,.dropzone.drag{border-color:var(--primary-2);transform:translateY(-2px)}
+  .dropzone .ic{width:54px;height:54px;border-radius:14px;background:var(--grad);margin:0 auto 12px;display:grid;place-items:center;box-shadow:var(--shadow)}
+  .dropzone .ic svg{width:26px;height:26px;color:#fff}
+  .dropzone h3{margin:0 0 6px;font-size:16px}
+  .dropzone p{margin:0;color:var(--muted);font-size:12px}
+  .dropzone small{display:block;margin-top:10px;color:var(--muted);font-size:11px}
+
+  /* Tabs */
+  .tabs{display:flex;gap:6px;padding:5px;background:var(--surface);border:1px solid var(--border);border-radius:12px;overflow-x:auto}
+  .tabs button{
+    background:transparent;border:0;color:var(--muted);padding:8px 14px;border-radius:9px;cursor:pointer;
+    font-size:13px;font-weight:500;white-space:nowrap;transition:all .2s
+  }
+  .tabs button.active{background:var(--grad);color:#fff;box-shadow:var(--shadow)}
+
+  /* KPI cards */
+  .kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:14px;margin:22px 0}
+  .kpi{padding:18px;border-radius:var(--radius);position:relative;overflow:hidden}
+  .kpi .label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1.2px;font-weight:600}
+  .kpi .value{font-family:var(--font-display);font-size:30px;font-weight:600;margin-top:6px;letter-spacing:-.5px}
+  .kpi .delta{display:inline-flex;align-items:center;gap:4px;font-size:12px;margin-top:8px;padding:3px 8px;border-radius:999px;background:rgba(52,231,181,0.12);color:var(--good)}
+  .kpi .delta.bad{background:rgba(255,107,129,0.12);color:var(--danger)}
+  .kpi .glow{position:absolute;width:160px;height:160px;border-radius:50%;background:var(--grad);filter:blur(60px);opacity:.18;top:-40px;right:-40px}
+
+  /* Section grid */
+  .grid-2{display:grid;grid-template-columns:1.4fr 1fr;gap:18px}
+  @media (max-width:1100px){.grid-2{grid-template-columns:1fr}}
+  .grid-3{display:grid;grid-template-columns:repeat(3,1fr);gap:18px}
+  @media (max-width:1000px){.grid-3{grid-template-columns:1fr 1fr}}
+  @media (max-width:680px){.grid-3{grid-template-columns:1fr}}
+
+  .card{padding:22px;border-radius:var(--radius)}
+  .card h3{margin:0 0 4px;font-family:var(--font-display);font-size:16px;font-weight:600;letter-spacing:-.2px}
+  .card .sub{color:var(--muted);font-size:12px;margin-bottom:14px}
+
+  /* Ratio table */
+  .ratio-cat{display:flex;align-items:center;justify-content:space-between;margin:18px 0 8px}
+  .ratio-cat h4{margin:0;font-family:var(--font-display);font-size:14px;letter-spacing:.3px;text-transform:uppercase;color:var(--muted)}
+  .ratio-cat .badge{font-size:11px;padding:3px 8px;border-radius:999px;background:var(--surface);border:1px solid var(--border);color:var(--muted)}
+  .ratios{display:grid;grid-template-columns:repeat(auto-fill,minmax(220px,1fr));gap:10px}
+  .ratio{
+    padding:14px;border-radius:14px;background:var(--surface);border:1px solid var(--border);
+    transition:all .2s;cursor:default
+  }
+  .ratio:hover{transform:translateY(-2px);border-color:rgba(124,92,255,0.4)}
+  .ratio .n{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:1px;font-weight:600}
+  .ratio .v{font-family:var(--font-display);font-size:22px;font-weight:600;margin-top:4px}
+  .ratio .meta{display:flex;justify-content:space-between;align-items:center;margin-top:6px;font-size:11px;color:var(--muted)}
+  .pill{padding:2px 8px;border-radius:999px;font-size:11px;font-weight:600}
+  .pill.good{background:rgba(52,231,181,0.15);color:var(--good)}
+  .pill.warn{background:rgba(255,182,72,0.15);color:var(--warn)}
+  .pill.bad{background:rgba(255,107,129,0.15);color:var(--danger)}
+  .pill.neutral{background:var(--surface-2);color:var(--muted)}
+
+  /* Health score */
+  .score-ring{position:relative;width:170px;height:170px;margin:0 auto}
+  .score-ring .v{position:absolute;inset:0;display:grid;place-items:center;font-family:var(--font-display);font-size:38px;font-weight:600}
+  .score-ring .v small{display:block;text-align:center;font-size:11px;color:var(--muted);letter-spacing:1.5px;margin-top:2px;font-weight:600}
+  .score-bars{display:flex;flex-direction:column;gap:14px;margin-top:6px}
+  .score-bar .top{display:flex;justify-content:space-between;font-size:12px;color:var(--muted);margin-bottom:6px}
+  .score-bar .track{height:8px;border-radius:99px;background:var(--surface-2);overflow:hidden}
+  .score-bar .fill{height:100%;border-radius:99px;background:var(--grad);transition:width 1s ease}
+
+  /* AI panel */
+  .ai-list{display:flex;flex-direction:column;gap:10px}
+  .ai-item{padding:14px;border-radius:12px;background:var(--surface);border:1px solid var(--border);display:flex;gap:12px}
+  .ai-item .ic{width:30px;height:30px;border-radius:8px;display:grid;place-items:center;flex-shrink:0;font-size:14px}
+  .ai-item.good .ic{background:rgba(52,231,181,0.15);color:var(--good)}
+  .ai-item.warn .ic{background:rgba(255,182,72,0.15);color:var(--warn)}
+  .ai-item.bad .ic{background:rgba(255,107,129,0.15);color:var(--danger)}
+  .ai-item .body{font-size:13px;line-height:1.55}
+  .ai-item .body b{font-family:var(--font-display)}
+
+  /* Saved analyses */
+  .saved-list{display:flex;flex-direction:column;gap:8px;max-height:280px;overflow:auto}
+  .saved-item{padding:12px;border:1px solid var(--border);border-radius:12px;background:var(--surface);display:flex;justify-content:space-between;align-items:center;gap:10px}
+  .saved-item .meta{font-size:12px;color:var(--muted)}
+  .saved-item .name{font-weight:600;font-size:13px}
+
+  /* Industry select */
+  .field{display:flex;flex-direction:column;gap:6px}
+  .field label{font-size:12px;color:var(--muted);font-weight:500}
+  .field select,.field input{
+    background:var(--surface-2);border:1px solid var(--border);color:var(--text);
+    padding:10px 12px;border-radius:10px;font-family:inherit;font-size:13px;outline:none;
+  }
+  .field select:focus,.field input:focus{border-color:var(--primary)}
+
+  .empty{padding:32px;text-align:center;color:var(--muted);font-size:13px}
+  .empty svg{width:42px;height:42px;opacity:.5;margin-bottom:10px}
+
+  /* Toast */
+  #toast{position:fixed;bottom:24px;right:24px;z-index:9999;display:flex;flex-direction:column;gap:8px}
+  .toast{padding:12px 16px;border-radius:12px;background:var(--surface-2);border:1px solid var(--border);box-shadow:var(--shadow);font-size:13px;animation:slideUp .3s ease}
+  .toast.good{border-color:rgba(52,231,181,0.4)}
+  .toast.bad{border-color:rgba(255,107,129,0.4)}
+  @keyframes slideUp{from{opacity:0;transform:translateY(10px)}to{opacity:1;transform:none}}
+
+  /* Modal */
+  .modal-wrap{position:fixed;inset:0;background:rgba(5,8,20,0.7);backdrop-filter:blur(8px);z-index:1000;display:none;align-items:center;justify-content:center;padding:20px}
+  .modal-wrap.open{display:flex}
+  .modal{max-width:760px;width:100%;max-height:88vh;overflow:auto;padding:28px}
+  .modal h3{font-family:var(--font-display);margin:0 0 12px}
+  .modal table{width:100%;border-collapse:collapse;font-size:13px}
+  .modal th,.modal td{padding:10px;border-bottom:1px solid var(--border);text-align:left}
+  .modal th{font-weight:600;color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:1px}
+  .modal td input{width:100%;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-family:inherit}
+
+  /* Animations */
+  .fade-in{animation:fadeIn .5s ease}
+  @keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:none}}
+
+  /* Hide views */
+  .view{display:none}
+  .view.active{display:block}
+
+  /* Chart container */
+  .chart-box{position:relative;height:300px}
+  .chart-box.sm{height:220px}
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar{width:8px;height:8px}
+  ::-webkit-scrollbar-track{background:transparent}
+  ::-webkit-scrollbar-thumb{background:var(--border);border-radius:4px}
+  ::-webkit-scrollbar-thumb:hover{background:var(--muted)}
+
+  /* Customizer */
+  .custom-panel{position:fixed;top:0;right:-360px;width:340px;height:100vh;z-index:900;padding:24px;transition:right .3s ease;overflow:auto}
+  .custom-panel.open{right:0}
+  .custom-panel h3{margin:0 0 16px;font-family:var(--font-display)}
+  .swatches{display:grid;grid-template-columns:repeat(6,1fr);gap:8px;margin-bottom:18px}
+  .swatch{width:100%;aspect-ratio:1;border-radius:10px;cursor:pointer;border:2px solid transparent;transition:all .2s}
+  .swatch:hover{transform:scale(1.08)}
+  .swatch.active{border-color:#fff;box-shadow:0 0 0 2px var(--primary)}
+</style>
+</head>
+<body>
+<div class="app">
+
+  <!-- SIDEBAR -->
+  <aside class="sidebar">
+    <div class="logo">
+      <div class="logo-mark">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M3 17l6-6 4 4 8-8"/><path d="M14 7h7v7"/></svg>
+      </div>
+      <div>
+        FinSight AI
+        <small>v1.0 · Analysis</small>
+      </div>
+    </div>
+
+    <nav class="nav" id="nav">
+      <button data-view="dashboard" class="active"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg> Dashboard</button>
+      <button data-view="ratios"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><path d="M7 14l4-4 4 4 5-5"/></svg> Ratios</button>
+      <button data-view="trends"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="8"/><rect x="12" y="6" width="3" height="12"/><rect x="17" y="13" width="3" height="5"/></svg> Trends</button>
+      <button data-view="benchmark"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><path d="M12 3v18M3 12h18"/></svg> Benchmark</button>
+      <button data-view="ai"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2a5 5 0 015 5v3a5 5 0 11-10 0V7a5 5 0 015-5z"/><path d="M8 18h8M10 22h4"/></svg> AI Insights</button>
+      <button data-view="saved"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21l-7-5-7 5V5a2 2 0 012-2h10a2 2 0 012 2z"/></svg> Saved</button>
+      <button data-view="data"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v14a9 3 0 0018 0V5"/><path d="M3 12a9 3 0 0018 0"/></svg> Raw Data</button>
+    </nav>
+
+    <div class="sidebar-foot">Made with ♥ — All processing happens in your browser. Nothing leaves your device.</div>
+  </aside>
+
+  <!-- MAIN -->
+  <main class="main">
+
+    <!-- TOP -->
+    <div class="topbar">
+      <div>
+        <h1>Financial Statement Analysis</h1>
+        <p>Upload balance sheet & P&amp;L · Get 30+ ratios, AI insights, and a full report instantly.</p>
+      </div>
+      <div class="top-actions">
+        <span class="chip"><span class="dot"></span> Engine ready</span>
+        <button class="btn ghost" id="themeToggle" title="Toggle theme">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M4.93 19.07l1.41-1.41M17.66 6.34l1.41-1.41"/></svg>
+          Theme
+        </button>
+        <button class="btn ghost" id="customizeBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 00.33 1.82l.06.06a2 2 0 11-2.83 2.83l-.06-.06a1.65 1.65 0 00-1.82-.33 1.65 1.65 0 00-1 1.51V21a2 2 0 11-4 0v-.09a1.65 1.65 0 00-1-1.51 1.65 1.65 0 00-1.82.33l-.06.06a2 2 0 11-2.83-2.83l.06-.06A1.65 1.65 0 005 15.4a1.65 1.65 0 00-1.51-1H3a2 2 0 110-4h.09A1.65 1.65 0 005 9.6a1.65 1.65 0 00-.33-1.82l-.06-.06a2 2 0 112.83-2.83l.06.06a1.65 1.65 0 001.82.33H9.6A1.65 1.65 0 0011 4.09V4a2 2 0 114 0v.09a1.65 1.65 0 001 1.51 1.65 1.65 0 001.82-.33l.06-.06a2 2 0 112.83 2.83l-.06.06a1.65 1.65 0 00-.33 1.82V11.4a1.65 1.65 0 001.51 1H21a2 2 0 110 4h-.09a1.65 1.65 0 00-1.51 1z"/></svg>
+          Customize
+        </button>
+        <button class="btn primary" id="exportPdfBtn">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>
+          Export PDF
+        </button>
+      </div>
+    </div>
+
+    <!-- VIEW: DASHBOARD -->
+    <section class="view active" id="view-dashboard">
+      <div class="hero glass fade-in">
+        <div>
+          <h2>Decode any company's <span class="grad">financial DNA</span> in seconds.</h2>
+          <p>Drop a balance sheet & P&amp;L (PDF or Excel). FinSight extracts the line items, runs 30+ ratios, benchmarks against your industry, and generates a clear, human-readable interpretation.</p>
+          <div class="top-actions">
+            <button class="btn primary" onclick="document.getElementById('fileInput').click()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+              Upload statements
+            </button>
+            <button class="btn" onclick="loadSampleData()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+              Try sample data
+            </button>
+            <button class="btn ghost" onclick="openEditor()">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 20h9M16.5 3.5a2.121 2.121 0 113 3L7 19l-4 1 1-4 12.5-12.5z"/></svg>
+              Enter manually
+            </button>
+          </div>
+          <div class="hero-stats">
+            <div class="hero-stat"><b>30+</b>Ratios computed</div>
+            <div class="hero-stat"><b>6</b>Industries benchmarked</div>
+            <div class="hero-stat"><b>100%</b>Client-side & private</div>
+          </div>
+        </div>
+        <div class="dropzone" id="dropzone">
+          <input type="file" id="fileInput" hidden multiple accept=".pdf,.xlsx,.xls,.csv" />
+          <div class="ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 01-2 2H5a2 2 0 01-2-2v-4M17 8l-5-5-5 5M12 3v12"/></svg>
+          </div>
+          <h3>Drag &amp; drop PDF or Excel</h3>
+          <p>Balance Sheet · Profit &amp; Loss · Cash Flow</p>
+          <small>Supports .pdf · .xlsx · .xls · .csv  (PDF/Excel ingestion via PDF.js + SheetJS)</small>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="kpis" id="kpiRow"></div>
+
+      <!-- Health & AI -->
+      <div class="grid-2">
+        <div class="card glass">
+          <h3>Financial Health Score</h3>
+          <div class="sub">Composite assessment based on liquidity, profitability, efficiency & leverage.</div>
+          <div style="display:grid;grid-template-columns:200px 1fr;gap:24px;align-items:center" id="healthBlock">
+            <div class="score-ring">
+              <canvas id="scoreRing" width="170" height="170"></canvas>
+              <div class="v"><div><span id="scoreVal">—</span><small id="scoreLabel">AWAITING DATA</small></div></div>
+            </div>
+            <div class="score-bars" id="scoreBars"></div>
+          </div>
+        </div>
+
+        <div class="card glass">
+          <h3>AI Interpretation</h3>
+          <div class="sub">Plain-English insights generated from the computed ratios.</div>
+          <div class="ai-list" id="aiList">
+            <div class="empty">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M12 2a5 5 0 015 5v3a5 5 0 11-10 0V7a5 5 0 015-5z"/><path d="M8 18h8M10 22h4"/></svg>
+              <div>Upload statements or load sample data to see AI-generated insights.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Charts -->
+      <div class="grid-2" style="margin-top:18px">
+        <div class="card glass">
+          <h3>Profitability Trend</h3>
+          <div class="sub">Margin evolution across reported periods.</div>
+          <div class="chart-box"><canvas id="profitChart"></canvas></div>
+        </div>
+        <div class="card glass">
+          <h3>Capital Structure</h3>
+          <div class="sub">Debt vs equity composition.</div>
+          <div class="chart-box"><canvas id="capChart"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: RATIOS -->
+    <section class="view" id="view-ratios">
+      <div class="card glass">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div>
+            <h3>Financial Ratios</h3>
+            <div class="sub">30+ ratios across 5 categories with industry benchmark comparison.</div>
+          </div>
+          <div class="field" style="min-width:200px">
+            <label>Industry benchmark</label>
+            <select id="industrySelect"></select>
+          </div>
+        </div>
+        <div id="ratiosWrap">
+          <div class="empty">No data yet — upload statements or load sample data.</div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: TRENDS -->
+    <section class="view" id="view-trends">
+      <div class="grid-2">
+        <div class="card glass">
+          <h3>Revenue &amp; Profit</h3><div class="sub">CAGR and YoY growth visualised.</div>
+          <div class="chart-box"><canvas id="trendRev"></canvas></div>
+        </div>
+        <div class="card glass">
+          <h3>Margins</h3><div class="sub">Gross, operating and net margin over time.</div>
+          <div class="chart-box"><canvas id="trendMargin"></canvas></div>
+        </div>
+        <div class="card glass">
+          <h3>Debt &amp; Equity</h3><div class="sub">Capital structure across periods.</div>
+          <div class="chart-box"><canvas id="trendDebt"></canvas></div>
+        </div>
+        <div class="card glass">
+          <h3>Working Capital</h3><div class="sub">Current assets minus current liabilities.</div>
+          <div class="chart-box"><canvas id="trendWC"></canvas></div>
+        </div>
+      </div>
+    </section>
+
+    <!-- VIEW: BENCHMARK -->
+    <section class="view" id="view-benchmark">
+      <div class="card glass">
+        <h3>Industry Benchmark</h3>
+        <div class="sub">Compare each ratio against the selected industry's typical range.</div>
+        <div class="chart-box" style="height:420px"><canvas id="benchChart"></canvas></div>
+      </div>
+    </section>
+
+    <!-- VIEW: AI -->
+    <section class="view" id="view-ai">
+      <div class="card glass">
+        <h3>AI Insights — Full Report</h3>
+        <div class="sub">Detailed interpretation for investment &amp; credit assessment.</div>
+        <div class="ai-list" id="aiListFull"><div class="empty">No data yet.</div></div>
+      </div>
+    </section>
+
+    <!-- VIEW: SAVED -->
+    <section class="view" id="view-saved">
+      <div class="card glass">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div><h3>Saved Analyses</h3><div class="sub">Stored locally in your browser.</div></div>
+          <div class="top-actions">
+            <input id="saveName" class="btn" style="background:var(--surface-2)" placeholder="Analysis name…" />
+            <button class="btn primary" onclick="saveCurrent()">Save current</button>
+            <button class="btn" onclick="exportJSON()">Export JSON</button>
+            <button class="btn" onclick="document.getElementById('jsonImport').click()">Import JSON</button>
+            <input type="file" hidden id="jsonImport" accept=".json"/>
+          </div>
+        </div>
+        <div class="saved-list" id="savedList" style="margin-top:16px"></div>
+      </div>
+    </section>
+
+    <!-- VIEW: DATA -->
+    <section class="view" id="view-data">
+      <div class="card glass">
+        <div style="display:flex;justify-content:space-between;align-items:center;flex-wrap:wrap;gap:10px">
+          <div><h3>Raw Extracted Data</h3><div class="sub">Edit any line item — ratios recalculate automatically.</div></div>
+          <div class="top-actions">
+            <button class="btn" onclick="addPeriod()">+ Add period</button>
+            <button class="btn" onclick="document.getElementById('fileInput').click()">Re-upload</button>
+          </div>
+        </div>
+        <div id="dataWrap" style="margin-top:14px;overflow:auto"></div>
+      </div>
+    </section>
+
+  </main>
+</div>
+
+<!-- Customizer -->
+<aside class="custom-panel glass" id="customPanel">
+  <h3>Customize</h3>
+  <div class="field" style="margin-bottom:14px"><label>Primary accent</label></div>
+  <div class="swatches" id="swatches"></div>
+  <div class="field" style="margin-bottom:14px"><label>Border radius</label>
+    <input type="range" id="radiusRange" min="6" max="28" value="18"/>
+  </div>
+  <div class="field" style="margin-bottom:14px"><label>Font</label>
+    <select id="fontSel">
+      <option value="Inter">Inter</option>
+      <option value="Space Grotesk">Space Grotesk</option>
+      <option value="system-ui">System</option>
+    </select>
+  </div>
+  <button class="btn" onclick="document.getElementById('customPanel').classList.remove('open')">Close</button>
+</aside>
+
+<!-- Manual editor modal -->
+<div class="modal-wrap" id="editorModal">
+  <div class="modal glass">
+    <div style="display:flex;justify-content:space-between;align-items:center">
+      <h3>Edit financial data</h3>
+      <button class="btn ghost" onclick="closeEditor()">✕</button>
+    </div>
+    <div id="editorBody"></div>
+    <div style="display:flex;gap:8px;margin-top:16px;justify-content:flex-end">
+      <button class="btn" onclick="closeEditor()">Cancel</button>
+      <button class="btn primary" onclick="saveEditor()">Apply</button>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+/* =========================================================
+   FinSight AI — single-file financial analysis platform
+   ========================================================= */
+
+pdfjsLib.GlobalWorkerOptions.workerSrc = 'https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js';
+
+/* ---------- STATE ---------- */
+const LS_KEY = 'finsight-saved-v1';
+const LS_THEME = 'finsight-theme';
+const LS_CUSTOM = 'finsight-custom';
+
+let state = {
+  periods: [],          // [{year, data:{...}}]
+  industry: 'IT',
+  ratios: [],           // current period ratios
+  charts: {}
+};
+
+const LINE_ITEMS = [
+  // Balance sheet
+  {key:'cash', label:'Cash & Equivalents', group:'BS'},
+  {key:'receivables', label:'Accounts Receivable', group:'BS'},
+  {key:'inventory', label:'Inventory', group:'BS'},
+  {key:'currentAssets', label:'Current Assets', group:'BS'},
+  {key:'totalAssets', label:'Total Assets', group:'BS'},
+  {key:'payables', label:'Accounts Payable', group:'BS'},
+  {key:'currentLiab', label:'Current Liabilities', group:'BS'},
+  {key:'longTermDebt', label:'Long-term Debt', group:'BS'},
+  {key:'totalLiab', label:'Total Liabilities', group:'BS'},
+  {key:'equity', label:'Shareholder Equity', group:'BS'},
+  {key:'shares', label:'Shares Outstanding', group:'BS'},
+  // P&L
+  {key:'revenue', label:'Revenue', group:'PL'},
+  {key:'cogs', label:'COGS', group:'PL'},
+  {key:'grossProfit', label:'Gross Profit', group:'PL'},
+  {key:'opex', label:'Operating Expenses', group:'PL'},
+  {key:'ebitda', label:'EBITDA', group:'PL'},
+  {key:'depreciation', label:'Depreciation', group:'PL'},
+  {key:'ebit', label:'Operating Profit (EBIT)', group:'PL'},
+  {key:'interest', label:'Interest Expense', group:'PL'},
+  {key:'tax', label:'Tax', group:'PL'},
+  {key:'netIncome', label:'Net Income', group:'PL'},
+  {key:'marketPrice', label:'Market Price / Share (opt.)', group:'PL'}
+];
+
+/* Industry benchmarks (typical ranges) */
+const BENCHMARKS = {
+  'IT':         {currentRatio:2.1,quickRatio:1.8,debtEquity:0.3,grossMargin:60,operatingMargin:22,netMargin:18,roe:22,roa:14,assetTurnover:0.8,interestCoverage:15},
+  'FMCG':       {currentRatio:1.4,quickRatio:0.9,debtEquity:0.6,grossMargin:45,operatingMargin:18,netMargin:12,roe:25,roa:12,assetTurnover:1.6,interestCoverage:10},
+  'Banking':    {currentRatio:1.1,quickRatio:1.0,debtEquity:6.0,grossMargin:55,operatingMargin:35,netMargin:22,roe:14,roa:1.2,assetTurnover:0.08,interestCoverage:3},
+  'Manufacturing':{currentRatio:1.7,quickRatio:1.0,debtEquity:0.8,grossMargin:30,operatingMargin:12,netMargin:7,roe:14,roa:6,assetTurnover:1.1,interestCoverage:5},
+  'Pharma':     {currentRatio:2.2,quickRatio:1.6,debtEquity:0.4,grossMargin:65,operatingMargin:24,netMargin:18,roe:18,roa:11,assetTurnover:0.7,interestCoverage:12},
+  'Retail':     {currentRatio:1.3,quickRatio:0.5,debtEquity:1.0,grossMargin:35,operatingMargin:8,netMargin:4,roe:18,roa:7,assetTurnover:2.2,interestCoverage:6}
+};
+
+/* ---------- HELPERS ---------- */
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+const fmt = (n, d=2) => n==null||isNaN(n) ? '—' : Number(n).toLocaleString('en-US',{maximumFractionDigits:d, minimumFractionDigits:d});
+const fmtMoney = n => n==null||isNaN(n) ? '—' : (Math.abs(n)>=1e9?'$'+(n/1e9).toFixed(2)+'B':Math.abs(n)>=1e6?'$'+(n/1e6).toFixed(2)+'M':Math.abs(n)>=1e3?'$'+(n/1e3).toFixed(1)+'K':'$'+n.toFixed(0));
+const safe = (a,b)=> (b && b!==0) ? a/b : null;
+
+function toast(msg, type='good'){
+  const el = document.createElement('div');
+  el.className='toast '+type;
+  el.textContent=msg;
+  $('#toast').appendChild(el);
+  setTimeout(()=>el.remove(),3500);
+}
+
+/* ---------- NAV ---------- */
+$$('#nav button').forEach(b=>{
+  b.onclick = () => {
+    $$('#nav button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active');
+    const v = b.dataset.view;
+    $$('.view').forEach(x=>x.classList.remove('active'));
+    $('#view-'+v).classList.add('active');
+    if(v==='trends') renderTrends();
+    if(v==='benchmark') renderBenchmark();
+    if(v==='ratios') renderRatios();
+    if(v==='ai') renderAIFull();
+    if(v==='saved') renderSaved();
+    if(v==='data') renderDataEditor();
+  };
+});
+
+/* ---------- THEME ---------- */
+function applyTheme(t){
+  document.documentElement.dataset.theme = t;
+  localStorage.setItem(LS_THEME, t);
+}
+$('#themeToggle').onclick = () => {
+  const cur = document.documentElement.dataset.theme === 'light' ? 'dark' : 'light';
+  applyTheme(cur);
+  // re-render charts for theme colors
+  redrawAll();
+};
+applyTheme(localStorage.getItem(LS_THEME) || 'dark');
+
+/* ---------- CUSTOMIZER ---------- */
+$('#customizeBtn').onclick = () => $('#customPanel').classList.toggle('open');
+const ACCENTS = [
+  {p:'#7c5cff',s:'#22d3ee'},
+  {p:'#22d3ee',s:'#34e7b5'},
+  {p:'#34e7b5',s:'#7c5cff'},
+  {p:'#ff6b81',s:'#ffb648'},
+  {p:'#ffb648',s:'#ff6b81'},
+  {p:'#3b82f6',s:'#06b6d4'},
+  {p:'#a855f7',s:'#ec4899'},
+  {p:'#f97316',s:'#eab308'},
+  {p:'#10b981',s:'#3b82f6'},
+  {p:'#ec4899',s:'#8b5cf6'},
+  {p:'#0ea5e9',s:'#22d3ee'},
+  {p:'#84cc16',s:'#22d3ee'},
+];
+const sw = $('#swatches');
+ACCENTS.forEach((a,i)=>{
+  const d=document.createElement('div');
+  d.className='swatch'; d.style.background=`linear-gradient(135deg,${a.p},${a.s})`;
+  d.onclick = () => {
+    document.documentElement.style.setProperty('--primary',a.p);
+    document.documentElement.style.setProperty('--primary-2',a.s);
+    document.documentElement.style.setProperty('--grad',`linear-gradient(135deg,${a.p} 0%,${a.s} 100%)`);
+    $$('.swatch').forEach(x=>x.classList.remove('active'));
+    d.classList.add('active');
+    localStorage.setItem(LS_CUSTOM, JSON.stringify({p:a.p,s:a.s,r:$('#radiusRange').value,f:$('#fontSel').value}));
+    redrawAll();
+  };
+  sw.appendChild(d);
+});
+$('#radiusRange').oninput = e => {
+  document.documentElement.style.setProperty('--radius', e.target.value+'px');
+};
+$('#fontSel').onchange = e => {
+  document.documentElement.style.setProperty('--font', `'${e.target.value}',system-ui,sans-serif`);
+};
+try{
+  const c = JSON.parse(localStorage.getItem(LS_CUSTOM)||'null');
+  if(c){
+    document.documentElement.style.setProperty('--primary',c.p);
+    document.documentElement.style.setProperty('--primary-2',c.s);
+    document.documentElement.style.setProperty('--grad',`linear-gradient(135deg,${c.p} 0%,${c.s} 100%)`);
+    if(c.r) {document.documentElement.style.setProperty('--radius',c.r+'px'); $('#radiusRange').value=c.r;}
+    if(c.f) {document.documentElement.style.setProperty('--font',`'${c.f}',system-ui,sans-serif`); $('#fontSel').value=c.f;}
+  }
+}catch(e){}
+
+/* ---------- INDUSTRY ---------- */
+const sel = $('#industrySelect');
+Object.keys(BENCHMARKS).forEach(k=>{
+  const o=document.createElement('option');o.value=k;o.textContent=k;sel.appendChild(o);
+});
+sel.value = state.industry;
+sel.onchange = () => {state.industry = sel.value; redrawAll();};
+
+/* ---------- UPLOAD ---------- */
+const dz = $('#dropzone');
+['dragenter','dragover'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.add('drag')}));
+['dragleave','drop'].forEach(ev=>dz.addEventListener(ev,e=>{e.preventDefault();dz.classList.remove('drag')}));
+dz.addEventListener('drop', e => handleFiles(e.dataTransfer.files));
+dz.addEventListener('click', () => $('#fileInput').click());
+$('#fileInput').addEventListener('change', e => handleFiles(e.target.files));
+
+async function handleFiles(files){
+  if(!files.length) return;
+  toast('Parsing '+files.length+' file(s)…');
+  for (const f of files){
+    try{
+      const ext = f.name.split('.').pop().toLowerCase();
+      if(['xlsx','xls','csv'].includes(ext)) await parseExcel(f);
+      else if(ext==='pdf') await parsePDF(f);
+      else toast('Unsupported file: '+f.name,'bad');
+    }catch(e){
+      console.error(e); toast('Failed to parse '+f.name,'bad');
+    }
+  }
+  if(state.periods.length){
+    toast('Extracted '+state.periods.length+' period(s) ✓');
+    redrawAll();
+  }
+}
+
+async function parseExcel(file){
+  const buf = await file.arrayBuffer();
+  const wb = XLSX.read(buf,{type:'array'});
+  const allText = [];
+  wb.SheetNames.forEach(sn=>{
+    const rows = XLSX.utils.sheet_to_json(wb.Sheets[sn],{header:1,defval:''});
+    rows.forEach(r => allText.push(r.map(c=>String(c)).join('\t')));
+  });
+  extractFromText(allText.join('\n'));
+}
+
+async function parsePDF(file){
+  const buf = await file.arrayBuffer();
+  const pdf = await pdfjsLib.getDocument({data:buf}).promise;
+  let text='';
+  for(let i=1;i<=pdf.numPages;i++){
+    const page = await pdf.getPage(i);
+    const tc = await page.getTextContent();
+    text += tc.items.map(it=>it.str).join(' ')+'\n';
+  }
+  extractFromText(text);
+}
+
+/* Heuristic line-item extraction from free text/tabular text */
+const PATTERNS = {
+  revenue: /(?:total\s+revenue|net\s+revenue|net\s+sales|total\s+income|revenue\s+from\s+operations|sales)/i,
+  cogs: /(?:cost\s+of\s+(?:goods\s+sold|sales|revenue)|cogs|cost\s+of\s+materials)/i,
+  grossProfit: /gross\s+profit/i,
+  opex: /(?:operating\s+expenses|total\s+operating\s+expenses|sg&a)/i,
+  ebitda: /ebitda/i,
+  depreciation: /(?:depreciation|amortization|depreciation\s+and\s+amortization)/i,
+  ebit: /(?:operating\s+(?:income|profit)|ebit\b)/i,
+  interest: /(?:interest\s+expense|finance\s+costs?)/i,
+  tax: /(?:income\s+tax|tax\s+expense|provision\s+for\s+tax)/i,
+  netIncome: /(?:net\s+(?:income|profit|earnings)|profit\s+for\s+the\s+(?:year|period)|profit\s+after\s+tax)/i,
+  cash: /(?:cash\s+(?:and|&)\s+(?:cash\s+)?equivalents)/i,
+  receivables: /(?:trade\s+receivables|accounts?\s+receivable|debtors)/i,
+  inventory: /(?:inventor(?:y|ies)|stock\s+in\s+trade)/i,
+  currentAssets: /(?:total\s+current\s+assets|current\s+assets)/i,
+  totalAssets: /total\s+assets/i,
+  payables: /(?:trade\s+payables|accounts?\s+payable|creditors)/i,
+  currentLiab: /(?:total\s+current\s+liabilities|current\s+liabilities)/i,
+  longTermDebt: /(?:long[-\s]term\s+(?:debt|borrowings)|non[-\s]current\s+borrowings)/i,
+  totalLiab: /total\s+liabilities/i,
+  equity: /(?:total\s+(?:shareholders?|stockholders?)\s+equity|total\s+equity|net\s+worth)/i,
+  shares: /(?:shares\s+outstanding|weighted\s+average\s+(?:number\s+of\s+)?shares)/i
+};
+
+function extractFromText(text){
+  // try to detect column headers / years
+  const yearMatches = [...text.matchAll(/\b(20\d{2}|19\d{2}|FY[\s-]?\d{2,4})\b/g)].map(m=>m[1]);
+  const years = [...new Set(yearMatches)].slice(0,5);
+  const periodCount = Math.max(1, Math.min(years.length, 5));
+  const periodYears = years.length ? years.slice(0,periodCount) : [String(new Date().getFullYear())];
+
+  const periodData = Array.from({length:periodCount}, ()=>({}));
+  const lines = text.split(/\n+/);
+
+  for(const [key,pat] of Object.entries(PATTERNS)){
+    for(const line of lines){
+      if(pat.test(line)){
+        // grab all numbers from the line
+        const nums = [...line.matchAll(/-?\(?\$?\s?[\d,]+(?:\.\d+)?\)?/g)]
+          .map(m => {
+            let s = m[0].replace(/[\$,\s]/g,'');
+            const neg = s.startsWith('(') && s.endsWith(')');
+            s = s.replace(/[()]/g,'');
+            const v = parseFloat(s);
+            return isNaN(v) ? null : (neg ? -v : v);
+          }).filter(v=>v!==null && Math.abs(v)>=1);
+        if(!nums.length) continue;
+        for(let i=0;i<periodCount;i++){
+          if(periodData[i][key]==null && nums[i]!=null){
+            periodData[i][key] = nums[i];
+          }
+        }
+        break;
+      }
+    }
+  }
+  // commit non-empty periods
+  const committed = [];
+  periodData.forEach((d,i)=>{
+    if(Object.keys(d).length>=4){
+      committed.push({year: periodYears[i]||('P'+(i+1)), data:d});
+    }
+  });
+  if(committed.length){
+    state.periods = committed.sort((a,b)=> String(a.year).localeCompare(String(b.year)));
+  } else {
+    toast('Could not auto-detect numbers. Try the manual editor.','bad');
+  }
+}
+
+/* ---------- SAMPLE DATA ---------- */
+function loadSampleData(){
+  state.periods = [
+    {year:'2021', data:{revenue:850000000,cogs:340000000,grossProfit:510000000,opex:280000000,ebitda:255000000,depreciation:25000000,ebit:230000000,interest:18000000,tax:53000000,netIncome:159000000,
+      cash:120000000,receivables:95000000,inventory:48000000,currentAssets:310000000,totalAssets:920000000,
+      payables:62000000,currentLiab:180000000,longTermDebt:160000000,totalLiab:380000000,equity:540000000,shares:50000000,marketPrice:78}},
+    {year:'2022', data:{revenue:980000000,cogs:380000000,grossProfit:600000000,opex:310000000,ebitda:310000000,depreciation:28000000,ebit:282000000,interest:20000000,tax:65000000,netIncome:197000000,
+      cash:150000000,receivables:110000000,inventory:55000000,currentAssets:360000000,totalAssets:1050000000,
+      payables:70000000,currentLiab:200000000,longTermDebt:170000000,totalLiab:420000000,equity:630000000,shares:50000000,marketPrice:92}},
+    {year:'2023', data:{revenue:1150000000,cogs:430000000,grossProfit:720000000,opex:355000000,ebitda:380000000,depreciation:32000000,ebit:348000000,interest:22000000,tax:81000000,netIncome:245000000,
+      cash:195000000,receivables:128000000,inventory:62000000,currentAssets:430000000,totalAssets:1220000000,
+      payables:78000000,currentLiab:225000000,longTermDebt:175000000,totalLiab:460000000,equity:760000000,shares:50000000,marketPrice:118}},
+    {year:'2024', data:{revenue:1340000000,cogs:490000000,grossProfit:850000000,opex:400000000,ebitda:460000000,depreciation:36000000,ebit:424000000,interest:24000000,tax:100000000,netIncome:300000000,
+      cash:260000000,receivables:148000000,inventory:70000000,currentAssets:520000000,totalAssets:1420000000,
+      payables:85000000,currentLiab:248000000,longTermDebt:180000000,totalLiab:492000000,equity:928000000,shares:50000000,marketPrice:148}}
+  ];
+  toast('Loaded sample dataset (4 years) ✓');
+  redrawAll();
+}
+
+/* ---------- RATIO ENGINE ---------- */
+function computeRatios(d){
+  const r = {};
+  // Liquidity
+  r.currentRatio = safe(d.currentAssets, d.currentLiab);
+  r.quickRatio = safe((d.currentAssets||0) - (d.inventory||0), d.currentLiab);
+  r.cashRatio = safe(d.cash, d.currentLiab);
+  r.workingCapital = (d.currentAssets||0) - (d.currentLiab||0);
+  // Profitability
+  r.grossMargin = safe(d.grossProfit, d.revenue)*100;
+  r.ebitdaMargin = safe(d.ebitda, d.revenue)*100;
+  r.operatingMargin = safe(d.ebit, d.revenue)*100;
+  r.netMargin = safe(d.netIncome, d.revenue)*100;
+  r.roa = safe(d.netIncome, d.totalAssets)*100;
+  r.roe = safe(d.netIncome, d.equity)*100;
+  r.roce = safe(d.ebit, (d.totalAssets||0)-(d.currentLiab||0))*100;
+  // Leverage
+  r.debtEquity = safe((d.longTermDebt||0)+(d.currentLiab||0)*0, d.equity);
+  r.debtRatio = safe(d.totalLiab, d.totalAssets);
+  r.equityRatio = safe(d.equity, d.totalAssets);
+  r.interestCoverage = safe(d.ebit, d.interest);
+  r.debtToAssets = safe(d.longTermDebt, d.totalAssets);
+  // Efficiency
+  r.assetTurnover = safe(d.revenue, d.totalAssets);
+  r.inventoryTurnover = safe(d.cogs, d.inventory);
+  r.receivableTurnover = safe(d.revenue, d.receivables);
+  r.payableTurnover = safe(d.cogs, d.payables);
+  r.daysReceivable = r.receivableTurnover ? 365/r.receivableTurnover : null;
+  r.daysInventory = r.inventoryTurnover ? 365/r.inventoryTurnover : null;
+  r.daysPayable = r.payableTurnover ? 365/r.payableTurnover : null;
+  r.ccc = (r.daysReceivable||0)+(r.daysInventory||0)-(r.daysPayable||0);
+  // Valuation
+  r.eps = safe(d.netIncome, d.shares);
+  r.bookValue = safe(d.equity, d.shares);
+  r.pe = (d.marketPrice && r.eps) ? d.marketPrice/r.eps : null;
+  r.pb = (d.marketPrice && r.bookValue) ? d.marketPrice/r.bookValue : null;
+  r.dividendYield = null;
+  return r;
+}
+
+const RATIO_DEFS = [
+  {cat:'Liquidity', items:[
+    {k:'currentRatio',n:'Current Ratio',fmt:v=>fmt(v,2)+'x',bench:'currentRatio',higher:true},
+    {k:'quickRatio',n:'Quick Ratio',fmt:v=>fmt(v,2)+'x',bench:'quickRatio',higher:true},
+    {k:'cashRatio',n:'Cash Ratio',fmt:v=>fmt(v,2)+'x'},
+    {k:'workingCapital',n:'Working Capital',fmt:v=>fmtMoney(v)}
+  ]},
+  {cat:'Profitability', items:[
+    {k:'grossMargin',n:'Gross Margin',fmt:v=>fmt(v,1)+'%',bench:'grossMargin',higher:true},
+    {k:'ebitdaMargin',n:'EBITDA Margin',fmt:v=>fmt(v,1)+'%'},
+    {k:'operatingMargin',n:'Operating Margin',fmt:v=>fmt(v,1)+'%',bench:'operatingMargin',higher:true},
+    {k:'netMargin',n:'Net Margin',fmt:v=>fmt(v,1)+'%',bench:'netMargin',higher:true},
+    {k:'roa',n:'ROA',fmt:v=>fmt(v,1)+'%',bench:'roa',higher:true},
+    {k:'roe',n:'ROE',fmt:v=>fmt(v,1)+'%',bench:'roe',higher:true},
+    {k:'roce',n:'ROCE',fmt:v=>fmt(v,1)+'%'}
+  ]},
+  {cat:'Leverage', items:[
+    {k:'debtEquity',n:'Debt / Equity',fmt:v=>fmt(v,2)+'x',bench:'debtEquity',higher:false},
+    {k:'debtRatio',n:'Debt Ratio',fmt:v=>fmt(v,2)+'x'},
+    {k:'equityRatio',n:'Equity Ratio',fmt:v=>fmt(v,2)+'x'},
+    {k:'interestCoverage',n:'Interest Coverage',fmt:v=>fmt(v,1)+'x',bench:'interestCoverage',higher:true},
+    {k:'debtToAssets',n:'LT Debt / Assets',fmt:v=>fmt(v,2)+'x'}
+  ]},
+  {cat:'Efficiency', items:[
+    {k:'assetTurnover',n:'Asset Turnover',fmt:v=>fmt(v,2)+'x',bench:'assetTurnover',higher:true},
+    {k:'inventoryTurnover',n:'Inventory Turnover',fmt:v=>fmt(v,2)+'x'},
+    {k:'receivableTurnover',n:'Receivable Turnover',fmt:v=>fmt(v,2)+'x'},
+    {k:'payableTurnover',n:'Payable Turnover',fmt:v=>fmt(v,2)+'x'},
+    {k:'daysReceivable',n:'Days Receivable',fmt:v=>fmt(v,0)+' d'},
+    {k:'daysInventory',n:'Days Inventory',fmt:v=>fmt(v,0)+' d'},
+    {k:'daysPayable',n:'Days Payable',fmt:v=>fmt(v,0)+' d'},
+    {k:'ccc',n:'Cash Conversion Cycle',fmt:v=>fmt(v,0)+' d'}
+  ]},
+  {cat:'Valuation', items:[
+    {k:'eps',n:'EPS',fmt:v=>'$'+fmt(v,2)},
+    {k:'bookValue',n:'Book Value / Share',fmt:v=>'$'+fmt(v,2)},
+    {k:'pe',n:'P/E Ratio',fmt:v=>fmt(v,1)+'x'},
+    {k:'pb',n:'P/B Ratio',fmt:v=>fmt(v,2)+'x'}
+  ]}
+];
+
+function ratioStatus(item, val){
+  if(val==null||isNaN(val)) return {cls:'neutral',txt:'—'};
+  const bench = BENCHMARKS[state.industry][item.bench];
+  if(!bench) return {cls:'neutral',txt:''};
+  const diff = ((val-bench)/Math.abs(bench))*100;
+  const good = item.higher ? val>=bench*0.95 : val<=bench*1.05;
+  const close = Math.abs(diff)<=15;
+  if(good) return {cls:'good', txt:(diff>=0?'+':'')+diff.toFixed(0)+'% vs ind.'};
+  if(close) return {cls:'warn', txt:(diff>=0?'+':'')+diff.toFixed(0)+'% vs ind.'};
+  return {cls:'bad', txt:(diff>=0?'+':'')+diff.toFixed(0)+'% vs ind.'};
+}
+
+/* ---------- RENDER: DASHBOARD ---------- */
+function latestPeriod(){return state.periods[state.periods.length-1];}
+
+function renderKPIs(){
+  const row = $('#kpiRow');
+  if(!state.periods.length){
+    row.innerHTML = '';
+    return;
+  }
+  const p = latestPeriod();
+  const r = computeRatios(p.data);
+  const prev = state.periods.length>1 ? computeRatios(state.periods[state.periods.length-2].data) : null;
+  const prevD = state.periods.length>1 ? state.periods[state.periods.length-2].data : null;
+
+  const items = [
+    {label:'Revenue', val:fmtMoney(p.data.revenue), d: prevD ? ((p.data.revenue-prevD.revenue)/prevD.revenue*100) : null},
+    {label:'Net Income', val:fmtMoney(p.data.netIncome), d: prevD ? ((p.data.netIncome-prevD.netIncome)/prevD.netIncome*100) : null},
+    {label:'ROE', val: r.roe!=null?fmt(r.roe,1)+'%':'—', d: prev ? (r.roe-prev.roe) : null, suffix:'pp'},
+    {label:'Net Margin', val: r.netMargin!=null?fmt(r.netMargin,1)+'%':'—', d: prev ? (r.netMargin-prev.netMargin) : null, suffix:'pp'},
+    {label:'Debt/Equity', val: r.debtEquity!=null?fmt(r.debtEquity,2)+'x':'—', d: prev ? (r.debtEquity-prev.debtEquity) : null, invert:true},
+    {label:'Current Ratio', val: r.currentRatio!=null?fmt(r.currentRatio,2)+'x':'—', d: prev ? (r.currentRatio-prev.currentRatio) : null}
+  ];
+  row.innerHTML = items.map(i=>{
+    let deltaHTML = '';
+    if(i.d!=null && !isNaN(i.d)){
+      const positive = i.invert ? i.d<0 : i.d>=0;
+      deltaHTML = `<div class="delta ${positive?'':'bad'}">${i.d>=0?'▲':'▼'} ${Math.abs(i.d).toFixed(i.suffix?1:1)}${i.suffix||'%'}</div>`;
+    }
+    return `<div class="kpi glass"><div class="glow"></div>
+      <div class="label">${i.label}</div>
+      <div class="value">${i.val}</div>
+      ${deltaHTML}
+    </div>`;
+  }).join('');
+}
+
+/* Health score */
+function computeHealth(){
+  if(!state.periods.length) return null;
+  const r = computeRatios(latestPeriod().data);
+  const b = BENCHMARKS[state.industry];
+  const norm = (v,target,higher=true,clamp=2)=>{
+    if(v==null||isNaN(v)) return 50;
+    const ratio = v/target;
+    let s = higher ? ratio*100 : (1/Math.max(ratio,0.0001))*100;
+    return Math.max(5, Math.min(100, s/clamp + 50));
+  };
+  const liq = (norm(r.currentRatio,b.currentRatio,true,1.5)+norm(r.quickRatio,b.quickRatio,true,1.5))/2;
+  const prof = (norm(r.netMargin,b.netMargin,true,1.5)+norm(r.roe,b.roe,true,1.5)+norm(r.operatingMargin,b.operatingMargin,true,1.5))/3;
+  const eff = (norm(r.assetTurnover,b.assetTurnover,true,1.5))*1;
+  const lev = (norm(r.debtEquity,b.debtEquity,false,1.5)+norm(r.interestCoverage,b.interestCoverage,true,1.5))/2;
+  const overall = (liq*0.2+prof*0.35+eff*0.2+lev*0.25);
+  return {liq:Math.round(liq), prof:Math.round(prof), eff:Math.round(eff), lev:Math.round(lev), overall:Math.round(overall)};
+}
+
+function renderHealth(){
+  const h = computeHealth();
+  const ring = $('#scoreRing');
+  if(!ring) return;
+  const ctx = ring.getContext('2d');
+  ctx.clearRect(0,0,170,170);
+  const cx=85,cy=85,rad=70;
+  // bg
+  ctx.beginPath();ctx.arc(cx,cy,rad,0,Math.PI*2);ctx.lineWidth=12;ctx.strokeStyle='rgba(255,255,255,0.08)';ctx.stroke();
+  if(h){
+    const g = ctx.createLinearGradient(0,0,170,170);
+    g.addColorStop(0, getComputedStyle(document.documentElement).getPropertyValue('--primary').trim());
+    g.addColorStop(1, getComputedStyle(document.documentElement).getPropertyValue('--primary-2').trim());
+    ctx.beginPath();ctx.arc(cx,cy,rad,-Math.PI/2, -Math.PI/2 + Math.PI*2*(h.overall/100));ctx.lineWidth=12;ctx.lineCap='round';ctx.strokeStyle=g;ctx.stroke();
+    $('#scoreVal').textContent = h.overall;
+    $('#scoreLabel').textContent = h.overall>=80?'STRONG':h.overall>=60?'STABLE':h.overall>=40?'WEAK':'CRITICAL';
+  } else {
+    $('#scoreVal').textContent='—';$('#scoreLabel').textContent='AWAITING DATA';
+  }
+  const bars = $('#scoreBars');
+  if(!h){bars.innerHTML='';return;}
+  const items = [['Liquidity',h.liq],['Profitability',h.prof],['Efficiency',h.eff],['Leverage',h.lev]];
+  bars.innerHTML = items.map(([n,v])=>`
+    <div class="score-bar">
+      <div class="top"><span>${n}</span><b style="color:var(--text)">${v}/100</b></div>
+      <div class="track"><div class="fill" style="width:${v}%"></div></div>
+    </div>`).join('');
+}
+
+/* AI interpretation */
+function generateInsights(){
+  if(!state.periods.length) return [];
+  const r = computeRatios(latestPeriod().data);
+  const b = BENCHMARKS[state.industry];
+  const out = [];
+
+  const insight = (cond, type, txt) => { if(cond) out.push({type,txt}); };
+
+  insight(r.roe!=null && r.roe>b.roe, 'good', `ROE of <b>${fmt(r.roe,1)}%</b> exceeds the ${state.industry} benchmark of ${b.roe}%, indicating efficient utilization of shareholder capital.`);
+  insight(r.roe!=null && r.roe<b.roe*0.7, 'bad', `ROE of <b>${fmt(r.roe,1)}%</b> is materially below the ${state.industry} benchmark (${b.roe}%) — capital is not being deployed efficiently.`);
+
+  insight(r.currentRatio!=null && r.currentRatio>2, 'good', `Strong short-term liquidity with a current ratio of <b>${fmt(r.currentRatio,2)}x</b>. Obligations are comfortably covered.`);
+  insight(r.currentRatio!=null && r.currentRatio<1, 'bad', `Current ratio of <b>${fmt(r.currentRatio,2)}x</b> falls below 1 — potential liquidity stress.`);
+  insight(r.quickRatio!=null && r.quickRatio<0.8, 'warn', `Quick ratio of <b>${fmt(r.quickRatio,2)}x</b> suggests reliance on inventory to meet near-term liabilities.`);
+
+  insight(r.netMargin!=null && r.netMargin>b.netMargin, 'good', `Net margin of <b>${fmt(r.netMargin,1)}%</b> beats the industry average — pricing power and cost discipline are evident.`);
+  insight(r.netMargin!=null && r.netMargin<b.netMargin*0.6, 'bad', `Net margin of <b>${fmt(r.netMargin,1)}%</b> trails the industry — investigate cost structure or pricing.`);
+
+  insight(r.debtEquity!=null && r.debtEquity>b.debtEquity*1.5, 'warn', `Leverage is elevated at D/E of <b>${fmt(r.debtEquity,2)}x</b> vs industry ${b.debtEquity}x.`);
+  insight(r.debtEquity!=null && r.debtEquity<b.debtEquity*0.5, 'good', `Conservative capital structure — D/E of <b>${fmt(r.debtEquity,2)}x</b> well below industry norms.`);
+  insight(r.interestCoverage!=null && r.interestCoverage<2.5, 'bad', `Interest coverage of <b>${fmt(r.interestCoverage,1)}x</b> is thin — debt service is a risk.`);
+  insight(r.interestCoverage!=null && r.interestCoverage>10, 'good', `Interest coverage of <b>${fmt(r.interestCoverage,1)}x</b> provides ample cushion for debt servicing.`);
+
+  insight(r.assetTurnover!=null && r.assetTurnover<b.assetTurnover*0.6, 'warn', `Asset turnover of <b>${fmt(r.assetTurnover,2)}x</b> indicates underutilized asset base relative to industry.`);
+
+  if(state.periods.length>=2){
+    const first = state.periods[0].data, last = latestPeriod().data;
+    const n = state.periods.length-1;
+    const revCagr = (Math.pow(last.revenue/first.revenue, 1/n)-1)*100;
+    const niCagr = (Math.pow(Math.max(last.netIncome,1)/Math.max(first.netIncome,1), 1/n)-1)*100;
+    if(!isNaN(revCagr)) insight(true, revCagr>10?'good':revCagr>0?'warn':'bad', `Revenue ${revCagr>=0?'grew':'declined'} at a <b>${fmt(revCagr,1)}%</b> CAGR over ${n} years.`);
+    if(!isNaN(niCagr)) insight(true, niCagr>15?'good':niCagr>0?'warn':'bad', `Net income ${niCagr>=0?'expanded':'contracted'} at <b>${fmt(niCagr,1)}%</b> CAGR — ${niCagr>revCagr?'operating leverage at work':'margin compression visible'}.`);
+  }
+
+  // Verdict
+  const h = computeHealth();
+  if(h){
+    const verdict = h.overall>=80 ? 'STRONG BUY candidate from a fundamentals lens — diversified strength across categories.'
+      : h.overall>=65 ? 'Fundamentally sound — suitable for core portfolio consideration with standard due diligence.'
+      : h.overall>=45 ? 'Mixed signals — selective exposure only; monitor leverage and margin trends.'
+      : 'Weak fundamental profile — high credit risk; avoid concentrated exposure.';
+    out.push({type: h.overall>=65?'good':h.overall>=45?'warn':'bad', txt:`<b>Investment Verdict:</b> ${verdict}`});
+  }
+  return out;
+}
+
+function renderAI(target='#aiList'){
+  const list = $(target);
+  const insights = generateInsights();
+  if(!insights.length){
+    list.innerHTML = `<div class="empty"><div>No data yet.</div></div>`;
+    return;
+  }
+  list.innerHTML = insights.map(i=>`
+    <div class="ai-item ${i.type}">
+      <div class="ic">${i.type==='good'?'✓':i.type==='warn'?'!':'✕'}</div>
+      <div class="body">${i.txt}</div>
+    </div>`).join('');
+}
+function renderAIFull(){ renderAI('#aiListFull'); }
+
+/* Charts */
+function chartOpts(){
+  const text = getComputedStyle(document.documentElement).getPropertyValue('--text').trim();
+  const muted = getComputedStyle(document.documentElement).getPropertyValue('--muted').trim();
+  const border = 'rgba(140,140,160,0.15)';
+  return {
+    responsive:true, maintainAspectRatio:false,
+    plugins:{legend:{labels:{color:muted, font:{family:'Inter', size:11}}}},
+    scales:{
+      x:{ticks:{color:muted}, grid:{color:border}},
+      y:{ticks:{color:muted}, grid:{color:border}}
+    }
+  };
+}
+
+function destroyChart(id){ if(state.charts[id]){state.charts[id].destroy(); delete state.charts[id];} }
+
+function renderDashboardCharts(){
+  destroyChart('profit'); destroyChart('cap');
+  if(!state.periods.length) return;
+  const labels = state.periods.map(p=>p.year);
+  const grossM=[], opM=[], netM=[];
+  state.periods.forEach(p=>{
+    const r=computeRatios(p.data);
+    grossM.push(r.grossMargin); opM.push(r.operatingMargin); netM.push(r.netMargin);
+  });
+  const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+  const primary2 = getComputedStyle(document.documentElement).getPropertyValue('--primary-2').trim();
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+
+  state.charts.profit = new Chart($('#profitChart'),{
+    type:'line',
+    data:{labels, datasets:[
+      {label:'Gross %', data:grossM, borderColor:primary, backgroundColor:primary+'33', tension:.35, fill:true},
+      {label:'Operating %', data:opM, borderColor:primary2, tension:.35},
+      {label:'Net %', data:netM, borderColor:accent, tension:.35}
+    ]}, options:chartOpts()
+  });
+
+  const last = latestPeriod().data;
+  state.charts.cap = new Chart($('#capChart'),{
+    type:'doughnut',
+    data:{labels:['Equity','Long-term Debt','Current Liab.'],
+      datasets:[{data:[last.equity||0,last.longTermDebt||0,last.currentLiab||0],
+        backgroundColor:[primary,primary2,accent], borderWidth:0}]},
+    options:{...chartOpts(),scales:undefined, cutout:'68%'}
+  });
+}
+
+function renderTrends(){
+  destroyChart('tr');destroyChart('tm');destroyChart('td');destroyChart('tw');
+  if(!state.periods.length) return;
+  const labels = state.periods.map(p=>p.year);
+  const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+  const primary2 = getComputedStyle(document.documentElement).getPropertyValue('--primary-2').trim();
+  const accent = getComputedStyle(document.documentElement).getPropertyValue('--accent').trim();
+
+  state.charts.tr = new Chart($('#trendRev'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Revenue',data:state.periods.map(p=>p.data.revenue),backgroundColor:primary},
+      {label:'Net Income',data:state.periods.map(p=>p.data.netIncome),backgroundColor:primary2}
+    ]},options:chartOpts()
+  });
+  const margins = state.periods.map(p=>computeRatios(p.data));
+  state.charts.tm = new Chart($('#trendMargin'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Gross %',data:margins.map(r=>r.grossMargin),borderColor:primary,tension:.3},
+      {label:'Operating %',data:margins.map(r=>r.operatingMargin),borderColor:primary2,tension:.3},
+      {label:'Net %',data:margins.map(r=>r.netMargin),borderColor:accent,tension:.3}
+    ]},options:chartOpts()
+  });
+  state.charts.td = new Chart($('#trendDebt'),{
+    type:'bar',
+    data:{labels,datasets:[
+      {label:'Equity',data:state.periods.map(p=>p.data.equity),backgroundColor:primary,stack:'s'},
+      {label:'LT Debt',data:state.periods.map(p=>p.data.longTermDebt),backgroundColor:primary2,stack:'s'}
+    ]},options:{...chartOpts(),scales:{x:{stacked:true,ticks:{color:'#8b93ad'}},y:{stacked:true,ticks:{color:'#8b93ad'}}}}
+  });
+  state.charts.tw = new Chart($('#trendWC'),{
+    type:'line',
+    data:{labels,datasets:[
+      {label:'Working Capital',data:state.periods.map(p=>(p.data.currentAssets||0)-(p.data.currentLiab||0)),borderColor:accent,backgroundColor:accent+'33',tension:.3,fill:true}
+    ]},options:chartOpts()
+  });
+}
+
+function renderBenchmark(){
+  destroyChart('bench');
+  if(!state.periods.length) return;
+  const r = computeRatios(latestPeriod().data);
+  const b = BENCHMARKS[state.industry];
+  const labels=['Current','Quick','D/E','Gross %','Op %','Net %','ROE','ROA','Asset T.','Int. Cov.'];
+  const co = [r.currentRatio,r.quickRatio,r.debtEquity,r.grossMargin,r.operatingMargin,r.netMargin,r.roe,r.roa,r.assetTurnover,r.interestCoverage];
+  const ind = [b.currentRatio,b.quickRatio,b.debtEquity,b.grossMargin,b.operatingMargin,b.netMargin,b.roe,b.roa,b.assetTurnover,b.interestCoverage];
+  const primary = getComputedStyle(document.documentElement).getPropertyValue('--primary').trim();
+  const primary2 = getComputedStyle(document.documentElement).getPropertyValue('--primary-2').trim();
+  state.charts.bench = new Chart($('#benchChart'),{
+    type:'radar',
+    data:{labels,datasets:[
+      {label:'Company',data:co,borderColor:primary,backgroundColor:primary+'40',pointBackgroundColor:primary},
+      {label:state.industry+' avg',data:ind,borderColor:primary2,backgroundColor:primary2+'30',pointBackgroundColor:primary2}
+    ]},
+    options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{labels:{color:'#8b93ad'}}},
+      scales:{r:{angleLines:{color:'rgba(140,140,160,0.2)'},grid:{color:'rgba(140,140,160,0.15)'},pointLabels:{color:'#8b93ad',font:{size:11}},ticks:{display:false}}}}
+  });
+}
+
+/* Ratios view */
+function renderRatios(){
+  const wrap = $('#ratiosWrap');
+  if(!state.periods.length){
+    wrap.innerHTML = '<div class="empty">No data yet.</div>'; return;
+  }
+  const r = computeRatios(latestPeriod().data);
+  wrap.innerHTML = RATIO_DEFS.map(cat=>`
+    <div class="ratio-cat"><h4>${cat.cat}</h4><div class="badge">${cat.items.length} ratios</div></div>
+    <div class="ratios">
+      ${cat.items.map(it=>{
+        const v = r[it.k];
+        const st = ratioStatus(it, v);
+        return `<div class="ratio">
+          <div class="n">${it.n}</div>
+          <div class="v">${v==null||isNaN(v)?'—':it.fmt(v)}</div>
+          <div class="meta">
+            <span>${it.bench?'Ind: '+(BENCHMARKS[state.industry][it.bench]||'—'):'&nbsp;'}</span>
+            <span class="pill ${st.cls}">${st.txt}</span>
+          </div>
+        </div>`;
+      }).join('')}
+    </div>
+  `).join('');
+}
+
+/* ---------- SAVED ANALYSES ---------- */
+function getSaved(){try{return JSON.parse(localStorage.getItem(LS_KEY)||'[]')}catch(e){return[]}}
+function setSaved(arr){localStorage.setItem(LS_KEY, JSON.stringify(arr))}
+function saveCurrent(){
+  if(!state.periods.length) return toast('Nothing to save','bad');
+  const name = $('#saveName').value.trim() || 'Analysis '+new Date().toLocaleString();
+  const arr = getSaved();
+  arr.unshift({id:Date.now(), name, savedAt:new Date().toISOString(), industry:state.industry, periods:state.periods});
+  setSaved(arr); $('#saveName').value='';
+  renderSaved(); toast('Saved ✓');
+}
+function deleteSaved(id){
+  setSaved(getSaved().filter(s=>s.id!==id)); renderSaved();
+}
+function loadSaved(id){
+  const s = getSaved().find(x=>x.id===id);
+  if(!s) return;
+  state.periods = s.periods; state.industry = s.industry; sel.value = s.industry;
+  redrawAll(); toast('Loaded '+s.name);
+}
+function renderSaved(){
+  const list = $('#savedList'); const arr = getSaved();
+  if(!arr.length){list.innerHTML='<div class="empty">No saved analyses yet.</div>';return;}
+  list.innerHTML = arr.map(s=>`
+    <div class="saved-item">
+      <div>
+        <div class="name">${s.name}</div>
+        <div class="meta">${new Date(s.savedAt).toLocaleString()} · ${s.industry} · ${s.periods.length} periods</div>
+      </div>
+      <div style="display:flex;gap:6px">
+        <button class="btn" onclick="loadSaved(${s.id})">Load</button>
+        <button class="btn danger" onclick="deleteSaved(${s.id})">Delete</button>
+      </div>
+    </div>`).join('');
+}
+function exportJSON(){
+  const blob = new Blob([JSON.stringify({industry:state.industry,periods:state.periods},null,2)],{type:'application/json'});
+  const a = document.createElement('a'); a.href=URL.createObjectURL(blob); a.download='finsight-analysis.json'; a.click();
+}
+$('#jsonImport').addEventListener('change', e=>{
+  const f = e.target.files[0]; if(!f) return;
+  const r = new FileReader();
+  r.onload = () => {
+    try{
+      const d = JSON.parse(r.result);
+      state.periods = d.periods; state.industry = d.industry||'IT'; sel.value=state.industry;
+      redrawAll(); toast('Imported ✓');
+    }catch(e){toast('Invalid JSON','bad')}
+  };
+  r.readAsText(f);
+});
+
+/* ---------- DATA EDITOR ---------- */
+function renderDataEditor(){
+  const wrap = $('#dataWrap');
+  if(!state.periods.length){
+    wrap.innerHTML = `<div class="empty">No data — upload statements or <a href="#" onclick="loadSampleData();return false">load sample</a>.</div>`;
+    return;
+  }
+  let html = '<table style="width:100%;border-collapse:collapse;font-size:13px"><thead><tr><th style="text-align:left;padding:10px;color:var(--muted)">Line Item</th>';
+  state.periods.forEach((p,i)=> html += `<th style="padding:10px;color:var(--muted)"><input value="${p.year}" data-y="${i}" style="background:transparent;border:1px solid var(--border);color:var(--text);padding:4px 8px;border-radius:6px;width:90px;font-family:inherit"/></th>`);
+  html += '</tr></thead><tbody>';
+  LINE_ITEMS.forEach(li=>{
+    html += `<tr><td style="padding:8px 10px;border-top:1px solid var(--border)"><b>${li.label}</b> <small style="color:var(--muted)">${li.group}</small></td>`;
+    state.periods.forEach((p,i)=>{
+      const v = p.data[li.key]??'';
+      html += `<td style="padding:6px;border-top:1px solid var(--border)"><input value="${v}" data-p="${i}" data-k="${li.key}" type="number" style="width:130px;background:var(--surface-2);border:1px solid var(--border);color:var(--text);padding:6px 8px;border-radius:6px;font-family:inherit"/></td>`;
+    });
+    html += '</tr>';
+  });
+  html += '</tbody></table>';
+  wrap.innerHTML = html;
+  wrap.querySelectorAll('input').forEach(inp=>{
+    inp.addEventListener('change', e=>{
+      const t = e.target;
+      if(t.dataset.y !== undefined){
+        state.periods[+t.dataset.y].year = t.value;
+      } else {
+        state.periods[+t.dataset.p].data[t.dataset.k] = t.value===''?null:parseFloat(t.value);
+      }
+      redrawAll();
+    });
+  });
+}
+function addPeriod(){
+  if(!state.periods.length){
+    state.periods.push({year:String(new Date().getFullYear()), data:{}});
+  } else {
+    const last = state.periods[state.periods.length-1];
+    state.periods.push({year:String(+last.year+1||'New'), data:{...last.data}});
+  }
+  renderDataEditor(); redrawAll();
+}
+
+function openEditor(){
+  if(!state.periods.length) state.periods=[{year:String(new Date().getFullYear()),data:{}}];
+  $('#editorModal').classList.add('open');
+  const body = $('#editorBody');
+  let html = '<table><thead><tr><th>Item</th>'+state.periods.map((p,i)=>`<th>${p.year}</th>`).join('')+'</tr></thead><tbody>';
+  LINE_ITEMS.forEach(li=>{
+    html += `<tr><td>${li.label}</td>`+state.periods.map((p,i)=>`<td><input type="number" data-p="${i}" data-k="${li.key}" value="${p.data[li.key]??''}"/></td>`).join('')+'</tr>';
+  });
+  html += '</tbody></table>';
+  body.innerHTML = html;
+}
+function closeEditor(){$('#editorModal').classList.remove('open');}
+function saveEditor(){
+  $('#editorBody').querySelectorAll('input').forEach(inp=>{
+    const v = inp.value===''?null:parseFloat(inp.value);
+    state.periods[+inp.dataset.p].data[inp.dataset.k] = v;
+  });
+  closeEditor(); redrawAll(); toast('Saved ✓');
+}
+
+/* ---------- EXPORT PDF ---------- */
+$('#exportPdfBtn').onclick = () => {
+  if(!state.periods.length) return toast('No data to export','bad');
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF({unit:'pt',format:'a4'});
+  const p = latestPeriod();
+  const r = computeRatios(p.data);
+  const h = computeHealth();
+  let y = 50;
+
+  doc.setFont('helvetica','bold'); doc.setFontSize(22); doc.text('FinSight AI — Financial Analysis Report', 40, y); y+=20;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10); doc.setTextColor(120);
+  doc.text(`Industry: ${state.industry}  ·  Latest period: ${p.year}  ·  Generated: ${new Date().toLocaleString()}`, 40, y); y+=24;
+
+  doc.setTextColor(20); doc.setFont('helvetica','bold'); doc.setFontSize(14);
+  doc.text('Executive Summary', 40, y); y+=18;
+  doc.setFont('helvetica','normal'); doc.setFontSize(10);
+  const insights = generateInsights().slice(0,6);
+  insights.forEach(i=>{
+    const txt = '• '+i.txt.replace(/<[^>]+>/g,'');
+    const lines = doc.splitTextToSize(txt, 515);
+    lines.forEach(l=>{ if(y>780){doc.addPage();y=50;} doc.text(l,40,y); y+=14; });
+    y+=2;
+  });
+  y+=10;
+
+  if(h){
+    doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text(`Financial Health Score: ${h.overall}/100`, 40, y); y+=18;
+    doc.setFont('helvetica','normal'); doc.setFontSize(10);
+    [['Liquidity',h.liq],['Profitability',h.prof],['Efficiency',h.eff],['Leverage',h.lev]].forEach(([n,v])=>{
+      doc.text(`${n}: ${v}/100`, 50, y); y+=14;
+    });
+    y+=8;
+  }
+
+  if(y>700){doc.addPage();y=50;}
+  doc.setFont('helvetica','bold'); doc.setFontSize(14); doc.text('Key Ratios', 40, y); y+=16;
+  doc.setFontSize(10);
+  RATIO_DEFS.forEach(cat=>{
+    if(y>770){doc.addPage();y=50;}
+    doc.setFont('helvetica','bold'); doc.text(cat.cat, 40, y); y+=14;
+    doc.setFont('helvetica','normal');
+    cat.items.forEach(it=>{
+      if(y>790){doc.addPage();y=50;}
+      const v = r[it.k];
+      doc.text(`${it.n}: ${v==null||isNaN(v)?'—':it.fmt(v)}`, 50, y); y+=12;
+    });
+    y+=6;
+  });
+
+  doc.save('FinSight-Report.pdf');
+  toast('Report exported ✓');
+};
+
+/* ---------- REDRAW ---------- */
+function redrawAll(){
+  renderKPIs();
+  renderHealth();
+  renderAI('#aiList');
+  renderAIFull();
+  renderDashboardCharts();
+  renderRatios();
+  renderTrends();
+  renderBenchmark();
+  renderDataEditor();
+  renderSaved();
+}
+
+redrawAll();
+
+// expose
+window.loadSampleData = loadSampleData;
+window.openEditor = openEditor;
+window.closeEditor = closeEditor;
+window.saveEditor = saveEditor;
+window.addPeriod = addPeriod;
+window.saveCurrent = saveCurrent;
+window.deleteSaved = deleteSaved;
+window.loadSaved = loadSaved;
+window.exportJSON = exportJSON;
+</script>
+</body>
+</html>
